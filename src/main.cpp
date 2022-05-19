@@ -3,9 +3,15 @@
 #include <stdio.h>
 #include <driver/rtc_io.h>
 #include <sys/time.h>
+#include "camera_web_server.h"
 
 #define LED_GPIO 33
 
+// ===========================
+// Enter your WiFi credentials
+// ===========================
+const char *ssid = "**********";
+const char *password = "**********";
 // 深度休眠唤醒次数计数, 硬件重启会清零
 RTC_DATA_ATTR int bootCount = 0;
 // 休眠唤醒相关
@@ -178,15 +184,19 @@ int calcDuration()
 
 void getTimeFromWifi()
 {
+  // TODO
 }
 
 void syncTime()
 {
+  // TODO
 }
 
 void setup()
 {
   Serial.begin(115200);
+  Serial.setDebugOutput(true);
+  Serial.println();
 
   if (bootCount == 0)
   {
@@ -200,10 +210,33 @@ void setup()
     Serial.printf("boot count %d\n", bootCount);
     printWakeupReason();
   }
+
   bootCount++;
 
-  initWakeup();
-  startSleep();
+  if (bootCount == 1)
+  {
+    initCameraServer();
+
+    Serial.print("WiFi Connecting ...\n");
+    WiFi.begin(ssid, password);
+    WiFi.setSleep(false);
+    while (WiFi.status() != WL_CONNECTED)
+    {
+      delay(500);
+      Serial.print(".");
+    }
+    Serial.println("");
+    Serial.println("WiFi connected");
+
+    Serial.print("Camera Ready! Use 'http://");
+    Serial.print(WiFi.localIP());
+    Serial.println("' to connect");
+  }
+  else
+  {
+    initWakeup();
+    startSleep();
+  }
 
   // 不会执行到这里
   pinMode(LED_GPIO, OUTPUT);
