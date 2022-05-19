@@ -21,24 +21,8 @@ const int ext_wakeup_pin_1 = 25; // 25脚为唤醒外部中断1
 const uint64_t ext_wakeup_pin_1_mask = 1ULL << ext_wakeup_pin_1;
 const int ext_wakeup_pin_2 = 26; // 26脚为唤醒外部中断2
 const uint64_t ext_wakeup_pin_2_mask = 1ULL << ext_wakeup_pin_2;
-// PWM设置相关
-const int motorFreq = 50;   // 频率(20ms周期)
-const int motorChannel = 8; // 通道(高速通道（0 ~ 7）由80MHz时钟驱动，低速通道（8 ~ 15）由 1MHz 时钟驱动。)
-const uint8_t motorRes = 8; // 分辨率
 
-int calculatePWM(int degree)
-{
-  // 20ms周期，高电平0.5-2.5ms，对应0-180度
-  const float deadZone = 6.4; // 对应0.5ms（0.5ms/(20ms/256）)
-  const float max = 32;       // 对应2.5ms
-
-  if (degree < 0)
-    degree = 0;
-  if (degree > 180)
-    degree = 180;
-
-  return (int)(((max - deadZone) / 180) * degree + deadZone);
-}
+void startCameraServer();
 
 void printWakeupReason()
 {
@@ -79,19 +63,6 @@ void printWakeupReason()
   default:
     Serial.printf("wakeup via other: %d\n", wakeup_case);
   }
-}
-
-int initMotorPWM()
-{
-  const int motor1Pin = GPIO_NUM_13;
-  const int motor2Pin = GPIO_NUM_12;
-  int ret = 0;
-  ledcAttachPin(motor1Pin, motorChannel);       // 将通道与对应的引脚连接
-  ledcSetup(motorChannel, motorFreq, motorRes); // 设置通道
-
-  ledcAttachPin(motor2Pin, motorChannel);       // 将通道与对应的引脚连接
-  ledcSetup(motorChannel, motorFreq, motorRes); // 设置通道
-  return ret;
 }
 
 int initWakeup()
@@ -182,11 +153,6 @@ int calcDuration()
   return duration_time_ms;
 }
 
-void getTimeFromWifi()
-{
-  // TODO
-}
-
 void syncTime()
 {
   // TODO
@@ -201,7 +167,6 @@ void setup()
   if (bootCount == 0)
   {
     Serial.println("first time to boot");
-    getTimeFromWifi();
     syncTime();
   }
   else
@@ -231,6 +196,7 @@ void setup()
     Serial.print("Camera Ready! Use 'http://");
     Serial.print(WiFi.localIP());
     Serial.println("' to connect");
+    startCameraServer();
   }
   else
   {
