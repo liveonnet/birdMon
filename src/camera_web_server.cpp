@@ -29,7 +29,7 @@
 #include "camera_pins.h"
 
 
-void initCameraServer() {
+void initCamera() {
   camera_config_t config;
   config.ledc_channel = LEDC_CHANNEL_0;
   config.ledc_timer = LEDC_TIMER_0;
@@ -58,6 +58,7 @@ void initCameraServer() {
   config.jpeg_quality = 12;
   config.fb_count = 1;
   
+/*
   // if PSRAM IC present, init with UXGA resolution and higher JPEG quality
   //                      for larger pre-allocated frame buffer.
   if(config.pixel_format == PIXFORMAT_JPEG){
@@ -77,6 +78,38 @@ void initCameraServer() {
     config.fb_count = 2;
 #endif
   }
+
+*/
+
+  if(psramFound()){
+    config.frame_size = FRAMESIZE_UXGA; // FRAMESIZE_ + QVGA|CIF|VGA|SVGA|XGA|SXGA|UXGA
+                                        // The following resolutions are available:
+                                        // 96x96 (96x96)
+                                        // QQVGA (160x120)
+                                        // QQVGA2 (128x160)
+                                        // QCIF (176x144)
+                                        // HQVGA (240x176)
+                                        // 240x240 (240x240)
+                                        // QVGA (320x240)
+                                        // CIF (400x296)
+                                        // VGA (640x480)
+                                        // SVGA (800x600)
+                                        // XGA (1024x768)
+                                        // SXGA (1280x1024)
+                                        // UXGA (1600x1200) **Full-resolution for OV2640
+
+    config.jpeg_quality = 10; // Valid: 0-63, with 0 being highest quality and largest file size.
+                              // Anything lower than 8 creates large file sizes that take a long time 
+                              // to save to the SD card. 
+                              // The camera and lens aren't the best quality, so huge files
+                              // won't get you a better picture beyond a certain point.
+    config.fb_count = 2; // With the PSRAM, there's enough memory for two framebuffers, which speeds captures.
+  } else {
+    config.frame_size = FRAMESIZE_SVGA;
+    config.jpeg_quality = 12;
+    config.fb_count = 1;
+  }
+ 
 
 #if defined(CAMERA_MODEL_ESP_EYE)
   pinMode(13, INPUT_PULLUP);

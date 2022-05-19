@@ -3,8 +3,19 @@
 #include <stdio.h>
 #include <driver/rtc_io.h>
 #include <sys/time.h>
+#include <FS.h>
+#include <SD_MMC.h>
+#include <soc/soc.h>
+#include <soc/rtc_cntl_reg.h>
+#include <driver/rtc_io.h>
+#include <time.h>
+#include <EEPROM.h>
+#include "lwip/apps/sntp.h"
 #include "camera_web_server.h"
 
+// define the number of bytes you want to access
+#define EEPROM_SIZE 1
+// led flash on broad
 #define LED_GPIO 33
 
 // ===========================
@@ -14,8 +25,11 @@ const char *ssid = "**********";
 const char *password = "**********";
 // 深度休眠唤醒次数计数, 硬件重启会清零
 RTC_DATA_ATTR int bootCount = 0;
+
+int imageNum = 0;
+
 // 休眠唤醒相关
-#define TIME_TO_SLEEP 20         // Time ESP32 will go to sleep (in seconds)
+#define TIME_TO_SLEEP 60         // Time ESP32 will go to sleep (in seconds)
 #define uS_TO_S_FACTOR 1000000   // Conversion factor for micro seconds to seconds
 const int ext_wakeup_pin_1 = 25; // 25脚为唤醒外部中断1
 const uint64_t ext_wakeup_pin_1_mask = 1ULL << ext_wakeup_pin_1;
@@ -24,11 +38,142 @@ const uint64_t ext_wakeup_pin_2_mask = 1ULL << ext_wakeup_pin_2;
 
 void startCameraServer();
 
-void printWakeupReason()
+int connectWiFi(const char *ssid, const char *password)
 {
+  WiFi.begin(ssid, password);
+  WiFi.setAutoReconnect(true);
+  while (WiFi.status() != WL_CONNECTED)
+  {
+    delay(500);
+    Serial.printf("Connecting to WIFI %s\n", ssid);
+  }
+  Serial.println("WIFI connected.");
+  Serial.println(WiFi.macAddress());
+  Serial.println(WiFi.localIP());
+  return 0;
+}
+
+void disconnectWiFi()
+{
+  Serial.println("disconnect WiFi");
+  WiFi.disconnect();
+}
+
+static void syncTime(void)
+{
+  Serial.println("Initializing SNTP");
+  sntp_setoperatingmode(SNTP_OPMODE_POLL);
+  sntp_setservername(0, "ntp1.aliyun.com");
+  sntp_setservername(1, "1.cn.pool.ntp.org");
+  sntp_init();
+
+  // wait for time to be set
+  time_t now = 0;
+  struct tm timeinfo = {0};
+  int retry = 0;
+  setenv("TZ", "CST-8", 1);
+  tzset();
+  while (timeinfo.tm_year < (2019 - 1900))
+  {
+    Serial.printf("Waiting for system time to be set... (%d)\n", ++retry);
+    vTaskDelay(100 / portTICK_PERIOD_MS);
+    time(&now);
+    localtime_r(&now, &timeinfo);
+  }
+
+  time_t t;
+  t = time(NULL);
+  Serial.printf("The number of seconds since January 1, 1970 is %ld\n", t);
+
+  char strftime_buf[64];
+  strftime(strftime_buf, sizeof(strftime_buf), "%c", &timeinfo);
+  Serial.printf("The current date/time in Beijing is: %s\n", strftime_buf);
+}
+
+void initSd()
+{
+  // if(!SD_MMC.begin()){
+  if (!SD_MMC.begin("/sdcard", true))
+  { // set mode1bit=true, to prevent gpio4 flash light from glowing
+    // in mode1bit, only GPIO 2(HS_DATA0) is used, GPIO 4(HS_DATA1)/12(HS_DATA2)/13(HS_DATA3) is free for other use
+    Serial.println("SD Card Mount Failed");
+    return;
+  }
+
+  uint8_t cardType = SD_MMC.cardType();
+  if (cardType == CARD_NONE)
+  {
+    Serial.println("No SD Card attached");
+    return;
+  }
+
+  /*
+  Serial.print("SD Card Type: ");
+  if(cardType == CARD_MMC){
+    Serial.println("MMC");
+  }
+  else if(cardType == CARD_SD){  Serial.println("SDSC");  }
+  else if(cardType == CARD_SDHC){  Serial.println("SDHC");  }
+  else {  Serial.println("UNKNOWN");  }
+
+  uint64_t cardSize = SD_MMC.cardSize() / (1024 * 1024);
+  Serial.printf("SD cap: %lluMB\n", cardSize);
+  */
+}
+
+void pic2tf()
+{
+  camera_fb_t *fb = NULL;
+
+  // Capture picture
+  fb = esp_camera_fb_get();
+  if (!fb)
+  {
+    Serial.println("Camera Failed to Capture");
+    return;
+  }
+  // initialize EEPROM
+  EEPROM.begin(EEPROM_SIZE);
+  imageNum = EEPROM.read(0) + 1;
+
+  // get time
+  time_t now = 0;
+  struct tm timeinfo = {0};
+  setenv("TZ", "CST-8", 1);
+  tzset();
+  time(&now);
+  localtime_r(&now, &timeinfo);
+
+  char strftime_buf[64];
+  strftime(strftime_buf, sizeof(strftime_buf), "%Y%m%d_%H%M%S_", &timeinfo);
+  Serial.printf("strftime_buf: %s\n", strftime_buf);
+  String path = "/p" + String(strftime_buf) + String(imageNum) + ".jpg";
+  Serial.printf("Picture file name: %s\n", path.c_str());
+
+  fs::FS &fs = SD_MMC;
+
+  File file = fs.open(path.c_str(), FILE_WRITE);
+  if (!file)
+  {
+    Serial.println("Failed to open file in writing mode");
+  }
+  else
+  {
+    file.write(fb->buf, fb->len);
+    Serial.printf("Saved file to path: %s\n", path.c_str());
+    EEPROM.write(0, imageNum);
+    EEPROM.commit();
+  }
+  file.close();
+  esp_camera_fb_return(fb);
+}
+
+// =0:timer wake up, >0:pin_num wake up
+int printWakeupReason()
+{
+  int ret = -1;
   esp_sleep_wakeup_cause_t wakeup_case = esp_sleep_get_wakeup_cause();
-  // 判断唤醒原因
-  switch (wakeup_case)
+  switch (wakeup_case) // 判断唤醒原因
   {
   case ESP_SLEEP_WAKEUP_EXT0:
     Serial.println("wakeup via RTC_IO signal");
@@ -38,8 +183,9 @@ void printWakeupReason()
     uint64_t wakeup_pin_mask = esp_sleep_get_ext1_wakeup_status();
     if (wakeup_pin_mask != 0)
     {
-      int pin = __builtin_ffsll(wakeup_pin_mask) - 1;
-      Serial.printf("Wake up from GPIO %dn\n", pin);
+      Serial.println((log(wakeup_pin_mask)) / log(2), 0);
+      ret = __builtin_ffsll(wakeup_pin_mask) - 1;
+      Serial.printf("Wake up from GPIO %dn\n", ret);
     }
     else
     {
@@ -51,6 +197,7 @@ void printWakeupReason()
   {
     // printf("Wake up from timer. Time spent in deep sleep: %dmsn", sleep_time_ms);
     Serial.println("Wake up from timer.");
+    ret = 0;
     break;
   }
   case ESP_SLEEP_WAKEUP_TOUCHPAD:
@@ -60,9 +207,14 @@ void printWakeupReason()
     Serial.println("wakeup via ULP signal");
     break;
   case ESP_SLEEP_WAKEUP_UNDEFINED: // 不是唤醒 正常执行
+    Serial.println("wakeup via undefined reason");
+    break;
   default:
     Serial.printf("wakeup via other: %d\n", wakeup_case);
+    break;
   }
+
+  return ret;
 }
 
 int initWakeup()
@@ -71,8 +223,10 @@ int initWakeup()
   Serial.printf("enable timer wakeup, %ds\n", TIME_TO_SLEEP);
   esp_sleep_enable_timer_wakeup(TIME_TO_SLEEP * uS_TO_S_FACTOR);
   // 使能外部中断唤醒
-  Serial.printf("Enabling EXT1 wakeup on pins GPIO%d, GPIO%d\n", ext_wakeup_pin_1, ext_wakeup_pin_2);
+  Serial.printf("enabling EXT1 wakeup on pins GPIO%d, GPIO%d\n", ext_wakeup_pin_1, ext_wakeup_pin_2);
   esp_sleep_enable_ext1_wakeup(ext_wakeup_pin_1_mask | ext_wakeup_pin_2_mask, ESP_EXT1_WAKEUP_ANY_HIGH);
+  Serial.printf("enabling EXT0 wakeup on pins %d\n", GPIO_NUM_13);
+  esp_sleep_enable_ext0_wakeup(GPIO_NUM_13, 1);
   // Isolate GPIO12 pin from external circuits. This is needed for modules
   // which have an external pull-up resistor on GPIO12 (such as ESP32-WROVER)
   // to minimize current consumption.
@@ -153,45 +307,20 @@ int calcDuration()
   return duration_time_ms;
 }
 
-void syncTime()
-{
-  // TODO
-}
-
 void setup()
 {
   Serial.begin(115200);
   Serial.setDebugOutput(true);
   Serial.println();
 
-  if (bootCount == 0)
-  {
-    Serial.println("first time to boot");
-    syncTime();
-  }
-  else
-  {
-    calcDuration();
-    Serial.printf("boot count %d\n", bootCount);
-    printWakeupReason();
-  }
-
   bootCount++;
-
   if (bootCount == 1)
   {
-    initCameraServer();
-
-    Serial.print("WiFi Connecting ...\n");
-    WiFi.begin(ssid, password);
-    WiFi.setSleep(false);
-    while (WiFi.status() != WL_CONNECTED)
-    {
-      delay(500);
-      Serial.print(".");
-    }
-    Serial.println("");
-    Serial.println("WiFi connected");
+    Serial.println("first time to boot");
+    initCamera();
+    connectWiFi(ssid, password);
+    syncTime();
+    // disconnectWiFi();
 
     Serial.print("Camera Ready! Use 'http://");
     Serial.print(WiFi.localIP());
@@ -200,6 +329,30 @@ void setup()
   }
   else
   {
+    Serial.printf("boot count %d\n", bootCount);
+    calcDuration();
+    int io_num = printWakeupReason();
+    switch (io_num)
+    {
+    case 0: // 超时和触发 ext_wakeup_pin_1 一个效果，都是拍照保存
+      Serial.println("timer wake up");
+    case ext_wakeup_pin_1:
+      Serial.printf("io %d wake up\n");
+      initCamera();
+      initSd();
+      pinMode(LED_GPIO, OUTPUT);
+      digitalWrite(LED_GPIO, LOW); // turn the red led next to the reset button ON
+      pic2tf();
+      digitalWrite(LED_GPIO, HIGH); // turn the red led next to the reset button OFF
+      break;
+    case ext_wakeup_pin_2: // 重启
+      Serial.printf("io %d wake up\n");
+      esp_restart();
+      // 需要验证是否bootCount重新改为0了，估计不会改，需要自己改为0以触发进入camerawebserver模式
+      break;
+    default:
+      break;
+    }
     initWakeup();
     startSleep();
   }
