@@ -28,6 +28,7 @@
 
 #include "camera_pins.h"
 
+void setSensor(sensor_t *s);
 
 void initCamera() {
   camera_config_t config;
@@ -50,7 +51,8 @@ void initCamera() {
   config.pin_pwdn = PWDN_GPIO_NUM;
   config.pin_reset = RESET_GPIO_NUM;
   config.xclk_freq_hz = 20000000;
-  config.frame_size = FRAMESIZE_UXGA;
+  // config.frame_size = FRAMESIZE_UXGA;
+  config.frame_size = FRAMESIZE_XGA;
   config.pixel_format = PIXFORMAT_JPEG; // for streaming
   //config.pixel_format = PIXFORMAT_RGB565; // for face detection/recognition
   config.grab_mode = CAMERA_GRAB_WHEN_EMPTY;
@@ -63,13 +65,16 @@ void initCamera() {
   //                      for larger pre-allocated frame buffer.
   if(config.pixel_format == PIXFORMAT_JPEG){
     if(psramFound()){
+      Serial.println("psramFound.");
       config.jpeg_quality = 10;
       config.fb_count = 2;
-      config.grab_mode = CAMERA_GRAB_LATEST;
+//      config.grab_mode = CAMERA_GRAB_LATEST;
     } else {
       // Limit the frame size when PSRAM is not available
       config.frame_size = FRAMESIZE_SVGA;
-      config.fb_location = CAMERA_FB_IN_DRAM;
+//      config.fb_location = CAMERA_FB_IN_DRAM;
+      config.jpeg_quality = 12;
+      config.fb_count = 1;
     }
   } else {
     // Best option for face detection/recognition
@@ -79,10 +84,16 @@ void initCamera() {
 #endif
   }
 
+#if defined(CAMERA_MODEL_ESP_EYE)
+  Serial.println("XXXXXXX");
+  pinMode(13, INPUT_PULLUP);
+  pinMode(14, INPUT_PULLUP);
+#endif
+
 */
 
   if(psramFound()){
-    config.frame_size = FRAMESIZE_UXGA; // FRAMESIZE_ + QVGA|CIF|VGA|SVGA|XGA|SXGA|UXGA
+    config.frame_size = FRAMESIZE_XGA; // FRAMESIZE_ + QVGA|CIF|VGA|SVGA|XGA|SXGA|UXGA
                                         // The following resolutions are available:
                                         // 96x96 (96x96)
                                         // QQVGA (160x120)
@@ -109,12 +120,6 @@ void initCamera() {
     config.jpeg_quality = 12;
     config.fb_count = 1;
   }
- 
-
-#if defined(CAMERA_MODEL_ESP_EYE)
-  pinMode(13, INPUT_PULLUP);
-  pinMode(14, INPUT_PULLUP);
-#endif
 
   // camera init
   esp_err_t err = esp_camera_init(&config);
@@ -123,6 +128,10 @@ void initCamera() {
     return;
   }
 
+  sensor_t *s = esp_camera_sensor_get();
+  setSensor(s);
+
+/*
   sensor_t * s = esp_camera_sensor_get();
   // initial sensors are flipped vertically and colors are a bit saturated
   if (s->id.PID == OV3660_PID) {
@@ -135,6 +144,8 @@ void initCamera() {
     s->set_framesize(s, FRAMESIZE_QVGA);
   }
 
+*/
+/*
 #if defined(CAMERA_MODEL_M5STACK_WIDE) || defined(CAMERA_MODEL_M5STACK_ESP32CAM)
   s->set_vflip(s, 1);
   s->set_hmirror(s, 1);
@@ -143,6 +154,8 @@ void initCamera() {
 #if defined(CAMERA_MODEL_ESP32S3_EYE)
   s->set_vflip(s, 1);
 #endif
-
+*/
+  delay(500);
+  Serial.println("init camera done.");
 }
 

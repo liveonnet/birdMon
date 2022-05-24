@@ -93,7 +93,7 @@
 
             section#buttons {
                 display: flex;
-                flex-wrap: nowrap;
+                flex-wrap: wrap;
                 justify-content: space-between
             }
 
@@ -385,7 +385,7 @@
                 <label for="nav-toggle-cb" id="nav-toggle">&#9776;&nbsp;&nbsp;Toggle OV2640 settings</label>
             </div>
             <div id="content">
-                <div id="sidebar">
+                <div id="sidebar" style="width:auto;height:100vh;overflow-y:auto">
                     <input type="checkbox" id="nav-toggle-cb" checked="checked">
                     <nav id="menu">
 
@@ -613,9 +613,13 @@
                             </div>
                         </div>
                         <section id="buttons">
+                            <div class="btn-group-vertical">
                             <button id="get-still">Get Still</button>
                             <button id="toggle-stream">Start Stream</button>
                             <button id="face_enroll" class="disabled" disabled="disabled">Enroll Face</button>
+                            <button id="deep-sleep">Deep Sleep</button>
+                            <button id="restart">Restart</button>
+                            </div>
                         </section>
 
                         <div style="margin-top: 8px;"><center><span style="font-weight: bold;">Advanced Settings</span></center></div>
@@ -715,7 +719,7 @@
                 <figure>
                     <div id="stream-container" class="image-container hidden">
                         <a id="save-still" href="#" class="button save" download="capture.jpg">Save</a>
-                        <div class="close" id="close-stream">��</div>
+                        <div class="close" id="close-stream">Close</div>
                         <img id="stream" src="" crossorigin>
                     </div>
                 </figure>
@@ -1020,6 +1024,8 @@ document.addEventListener('DOMContentLoaded', function (event) {
   const stillButton = document.getElementById('get-still')
   const streamButton = document.getElementById('toggle-stream')
   const enrollButton = document.getElementById('face_enroll')
+  const deepSleepButton = document.getElementById('deep-sleep')
+  const restartButton = document.getElementById('restart')
   const closeButton = document.getElementById('close-stream')
   const saveButton = document.getElementById('save-still')
   const ledGroup = document.getElementById('led-group')
@@ -1058,6 +1064,14 @@ document.addEventListener('DOMContentLoaded', function (event) {
 
   enrollButton.onclick = () => {
     updateConfig(enrollButton)
+  }
+
+  deepSleepButton.onclick = () => {
+    view.src = `${baseHost}/deep_sleep`
+  }
+
+  restartButton.onclick = () => {
+    view.src = `${baseHost}/restart`
   }
 
   saveButton.onclick = () => {

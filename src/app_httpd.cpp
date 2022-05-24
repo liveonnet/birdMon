@@ -11,16 +11,18 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-#include "esp_http_server.h"
-#include "esp_timer.h"
-#include "esp_camera.h"
-#include "img_converters.h"
-#include "fb_gfx.h"
-#include "driver/ledc.h"
-#include "sdkconfig.h"
+#include <esp_http_server.h>
+#include <esp_timer.h>
+#include <esp_camera.h>
+#include <img_converters.h>
+#include <fb_gfx.h>
+#include <driver/ledc.h>
+#include <sdkconfig.h>
+#include <esp_system.h>
 #include "camera_index.h"
 #include "camera_index_ov2640.h"
 #include "my_motor.h"
+#include "comm.h"
 
 #if defined(ARDUINO_ARCH_ESP32) && defined(CONFIG_ARDUHAL_ESP_LOG)
 #include "esp32-hal-log.h"
@@ -753,7 +755,7 @@ static esp_err_t stream_handler(httpd_req_t *req)
         }
         if (res != ESP_OK)
         {
-            ESP_LOGE(TAG, "send frame failed failed");
+            ESP_LOGE(TAG, "send frame failed");
             break;
         }
         int64_t fr_end = esp_timer_get_time();
@@ -794,6 +796,33 @@ static esp_err_t stream_handler(httpd_req_t *req)
 
     return res;
 }
+
+static esp_err_t deep_sleep_handler(httpd_req_t *req)
+{
+    Serial.println("to enter deep sleep");
+    initWakeup();
+    startSleep();
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+    return httpd_resp_send(req, NULL, 0);
+}
+
+void ARDUINO_ISR_ATTR resetModule() {
+  ets_printf("reboot\n");
+  esp_restart(); // bootCount将重新改为0
+}
+
+static esp_err_t restart_handler(httpd_req_t *req)
+{
+    Serial.println("to restart from web cmd");
+    const int wdtTimeout = 5000;  //time in ms to trigger the watchdog
+    hw_timer_t *timer = timerBegin(0, 80, true);  //timer 0, div 80
+    timerAttachInterrupt(timer, &resetModule, true);  //attach callback
+    timerAlarmWrite(timer, wdtTimeout * 1000, false); //set time in us
+    timerAlarmEnable(timer);  //enable interrupt
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+    return httpd_resp_send(req, NULL, 0);
+}
+
 
 static esp_err_t parse_get(httpd_req_t *req, char **obuf)
 {
@@ -1243,6 +1272,18 @@ void startCameraServer()
         .handler = stream_handler,
         .user_ctx = NULL};
 
+    httpd_uri_t deep_sleep_uri = {
+        .uri = "/deep_sleep",
+        .method = HTTP_GET,
+        .handler = deep_sleep_handler,
+        .user_ctx = NULL};
+
+    httpd_uri_t restart_uri = {
+        .uri = "/restart",
+        .method = HTTP_GET,
+        .handler = restart_handler,
+        .user_ctx = NULL};
+
     httpd_uri_t bmp_uri = {
         .uri = "/bmp",
         .method = HTTP_GET,
@@ -1295,6 +1336,8 @@ void startCameraServer()
         httpd_register_uri_handler(camera_httpd, &status_uri);
         httpd_register_uri_handler(camera_httpd, &capture_uri);
         httpd_register_uri_handler(camera_httpd, &bmp_uri);
+        httpd_register_uri_handler(camera_httpd, &deep_sleep_uri);
+        httpd_register_uri_handler(camera_httpd, &restart_uri);
 
         httpd_register_uri_handler(camera_httpd, &xclk_uri);
         httpd_register_uri_handler(camera_httpd, &reg_uri);
@@ -1310,4 +1353,6 @@ void startCameraServer()
     {
         httpd_register_uri_handler(stream_httpd, &stream_uri);
     }
+
+    // initMotorPWM();
 }
