@@ -255,6 +255,13 @@ int initWakeup()
   esp_sleep_enable_ext1_wakeup(ext_wakeup_pin_1_mask | ext_wakeup_pin_2_mask, ESP_EXT1_WAKEUP_ANY_HIGH);
 */
 
+  pinMode(ext_wakeup_pin_1, INPUT);
+  Serial.printf("enable EXT1 wakeup on pins GPIO%d\n", ext_wakeup_pin_1);
+  esp_sleep_enable_ext1_wakeup(ext_wakeup_pin_1_mask, ESP_EXT1_WAKEUP_ANY_HIGH);
+
+  // pinMode(GPIO_NUM_16, INPUT);
+
+
   // pinMode(GPIO_NUM_13, INPUT);
   // Serial.printf("enabling EXT0 wakeup on pins %d\n", GPIO_NUM_13);
   // esp_sleep_enable_ext0_wakeup(GPIO_NUM_13, 1);
@@ -297,4 +304,11 @@ void startSleep()
   Serial.flush();
   esp_deep_sleep_start();
   Serial.println("This will never be printed !!!!");
+}
+
+// no use now
+void IRAM_ATTR isrRestart()
+{
+  // ets_printf("reboot\n");
+  esp_restart(); // bootCount将重新改为0
 }

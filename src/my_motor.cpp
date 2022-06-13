@@ -5,17 +5,33 @@ int initMotorPWM()
   const int motor1Pin = GPIO_NUM_12;
   const int motor2Pin = GPIO_NUM_13;
   int ret = 0;
-  Serial.printf("pin %d - channel %d freq %d res %d\n", motor1Pin, motor1Channel, motorFreq, motorRes);
+  if(disablePWM){
+    Serial.println("disablePWM no init");
+    return ret;
+  }
+
+  Serial.printf("motorPWM using pin %d - channel %d freq %d res %d\n", motor1Pin, motor1Channel, motorFreq, motorRes);
   ledcAttachPin(motor1Pin, motor1Channel);       // 将通道与对应的引脚连接
   ledcSetup(motor1Channel, motorFreq, motorRes); // 设置通道
 
-  Serial.printf("pin %d - channel %d freq %d res %d\n", motor2Pin, motor2Channel, motorFreq, motorRes);
+  Serial.printf("motorPWM using pin %d - channel %d freq %d res %d\n", motor2Pin, motor2Channel, motorFreq, motorRes);
   ledcAttachPin(motor2Pin, motor2Channel);       // 将通道与对应的引脚连接
   ledcSetup(motor2Channel, motorFreq, motorRes); // 设置通道
   Serial.println("Motor PWM inited.");
   return ret;
 }
 
+int finalMotorPWM()
+{
+  int ret=0;
+  if(disablePWM){
+    Serial.println("disablePWM no final");
+    return ret;
+  }
+  ledcDetachPin(motor1Pin);
+  ledcDetachPin(motor2Pin);
+  return ret;
+}
 
 int calculatePWM(int degree)
 {
@@ -35,6 +51,10 @@ int calculatePWM(int degree)
 int set_motor1(int degree)
 {
     int ret = 0;
+    if(disablePWM){
+      Serial.println("disablePWM motor1 disabled");
+      return ret;
+    }
     Serial.printf("motor1 set to degree %d\n", degree);
     ledcWrite(motor1Channel,calculatePWM(degree));// 输出PWM
     delay(20);
@@ -44,6 +64,10 @@ int set_motor1(int degree)
 int set_motor2(int degree)
 {
     int ret = 0;
+    if(disablePWM){
+      Serial.println("disablePWM motor2 disabled");
+      return ret;
+    }
     Serial.printf("motor2 set to degree %d\n", degree);
     ledcWrite(motor2Channel,calculatePWM(degree));// 输出PWM
     delay(20);

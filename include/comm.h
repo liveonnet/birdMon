@@ -22,9 +22,9 @@
 // 休眠唤醒相关
 #define TIME_TO_SLEEP 60         // Time ESP32 will go to sleep (in seconds)
 #define uS_TO_S_FACTOR 1000000   // Conversion factor for micro seconds to seconds
-const int ext_wakeup_pin_1 = 13; // 唤醒外部中断1
+const int ext_wakeup_pin_1 = 12; // 唤醒外部中断1
 const uint64_t ext_wakeup_pin_1_mask = 1ULL << ext_wakeup_pin_1;
-const int ext_wakeup_pin_2 = 12; // 唤醒外部中断2
+const int ext_wakeup_pin_2 = 13; // 唤醒外部中断2
 const uint64_t ext_wakeup_pin_2_mask = 1ULL << ext_wakeup_pin_2;
 
 
@@ -38,3 +38,4 @@ int printWakeupReason();
 int calcDuration();
 int initWakeup();
 void startSleep();
+void IRAM_ATTR isrRestart();

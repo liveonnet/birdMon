@@ -800,6 +800,7 @@ static esp_err_t stream_handler(httpd_req_t *req)
 static esp_err_t deep_sleep_handler(httpd_req_t *req)
 {
     Serial.println("to enter deep sleep");
+    finalMotorPWM();
     initWakeup();
     startSleep();
     httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");

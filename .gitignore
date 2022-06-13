@@ -6,3 +6,5 @@
 include/README
 lib/README
 test/README
+include/private_info.h
+birdMon.rar

@@ -22,6 +22,10 @@ void setup()
   Serial.setDebugOutput(true);
   Serial.println();
 
+  // 中断处理
+  // pinMode(GPIO_NUM_16, INPUT_PULLUP);
+  // attachInterrupt(GPIO_NUM_16, isrRestart, FALLING);
+
   bootCount++;
   if (bootCount == 1)
   {
@@ -72,7 +76,6 @@ void setup()
     {
     case 0: // 超时和触发 ext_wakeup_pin_1 一个效果，都是拍照保存
       Serial.println("timer wake up");
-
 
       initCamera();
       initSd();
