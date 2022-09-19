@@ -137,6 +137,8 @@ typedef struct
 
 static ra_filter_t ra_filter;
 
+// hw_timer_t *timer;
+
 static ra_filter_t *ra_filter_init(ra_filter_t *filter, size_t sample_size)
 {
     memset(filter, 0, sizeof(ra_filter_t));
@@ -808,8 +810,15 @@ static esp_err_t deep_sleep_handler(httpd_req_t *req)
 }
 
 void ARDUINO_ISR_ATTR resetModule() {
-  ets_printf("reboot\n");
-  esp_restart(); // bootCount将重新改为0
+    Serial.println("reboot now");
+    //timerAlarmDisable(timer);
+    //timerDetachInterrupt(timer);
+    //timerStop(timer);
+    //httpd_stop(stream_httpd);
+    //httpd_stop(camera_httpd);
+    // delay(1000);
+    Serial.println("to rstart ... (fake)");
+    // esp_restart(); // bootCount将重新改为0
 }
 
 static esp_err_t restart_handler(httpd_req_t *req)
@@ -817,6 +826,7 @@ static esp_err_t restart_handler(httpd_req_t *req)
     Serial.println("to restart from web cmd");
     const int wdtTimeout = 5000;  //time in ms to trigger the watchdog
     hw_timer_t *timer = timerBegin(0, 80, true);  //timer 0, div 80
+    // timer = timerBegin(0, 80, true);  //timer 0, div 80
     timerAttachInterrupt(timer, &resetModule, true);  //attach callback
     timerAlarmWrite(timer, wdtTimeout * 1000, false); //set time in us
     timerAlarmEnable(timer);  //enable interrupt

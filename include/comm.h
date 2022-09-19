@@ -1,3 +1,5 @@
+#ifndef _COMM_H_
+#define _COMM_H_
 #include <Arduino.h>
 #include <WiFi.h>
 #include <esp_camera.h>
@@ -13,6 +15,7 @@
 #include "lwip/apps/sntp.h"
 #include <time.h>
 #include <EEPROM.h>
+#include "private_info.h"
 
 // define the number of bytes you want to access
 #define EEPROM_SIZE 1
@@ -39,3 +42,5 @@ int calcDuration();
 int initWakeup();
 void startSleep();
 void IRAM_ATTR isrRestart();
+
+#endif

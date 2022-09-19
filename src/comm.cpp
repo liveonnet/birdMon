@@ -240,8 +240,27 @@ int calcDuration()
 int initWakeup()
 {
   int ret = 0;
-  Serial.printf("enable timer wakeup, %ds\n", TIME_TO_SLEEP);
-  esp_sleep_enable_timer_wakeup(TIME_TO_SLEEP * uS_TO_S_FACTOR);
+  // 查看当前小时，决定休眠时间
+  time_t now = time(NULL);
+  struct tm *ti;
+  ti = localtime(&now);
+  uint64_t second2sleep = 0;
+  if(ti->tm_hour >= END_HOUR || ti->tm_hour < START_HOUR){
+    if(ti->tm_hour >= END_HOUR){
+      time_t tomorrow_second = now + 3600 * 24;
+      ti = localtime(&tomorrow_second);
+    }
+    ti->tm_hour = START_HOUR;
+    ti->tm_min = 0;
+    ti->tm_sec = 0;
+    second2sleep = difftime(mktime(ti), now) + 1;
+    Serial.printf("enable timer wakeup [%d, %d), %ds\n", END_HOUR, START_HOUR, second2sleep);
+    esp_sleep_enable_timer_wakeup(second2sleep * uS_TO_S_FACTOR);
+  }
+  else{
+    Serial.printf("enable timer wakeup, %ds\n", TIME_TO_SLEEP);
+    esp_sleep_enable_timer_wakeup(TIME_TO_SLEEP * uS_TO_S_FACTOR);
+  }
 
   // pinMode(GPIO_NUM_4, OUTPUT);
   // digitalWrite(GPIO_NUM_4, LOW);

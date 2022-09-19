@@ -6,5 +6,5 @@
 include/README
 lib/README
 test/README
-include/private_info.h
+src/private_info.cpp
 birdMon.rar

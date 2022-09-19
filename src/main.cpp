@@ -1,7 +1,6 @@
 #include "comm.h"
 #include "camera_web_server.h"
 #include "my_motor.h"
-#include "private_info.h"
 
 // 深度休眠唤醒次数计数, 硬件重启会清零
 RTC_DATA_ATTR int bootCount = 0;
@@ -69,8 +68,15 @@ void setup()
     // digitalWrite(GPIO_NUM_4, LOW);
     // rtc_gpio_hold_en(GPIO_NUM_4);
 
+    // debug only
+    // connectWiFi(ssid, password);
+    // syncTime();
+    // disconnectWiFi();
+
     Serial.printf("boot count %d\n", bootCount);
-    calcDuration();
+    if(bootCount != 1){
+      calcDuration();
+    }
     int io_num = printWakeupReason();
     switch (io_num)
     {
@@ -116,7 +122,6 @@ void setup()
     startSleep();
   }
 
-  // 不会执行到这里
   // pinMode(LED_GPIO, OUTPUT);
 }
 
